@@ -36,10 +36,6 @@ E5 Renew Plus 只有 Windows 版且未开源，E5 Renew X 的 C# 源码要装 .N
 
 打开 <https://microsoft.com/devicelogin>，粘贴窗口里的代码，用 E5 账号登录并同意。
 
-## 数据放哪
-
-配置和令牌在 `~/Library/Application Support/E5Keeper/`，`secrets.json` 权限 600。换位置、重编译都不丢，不用重新登录。
-
 ## 编译安装
 
 ```bash
@@ -50,12 +46,6 @@ cd E5Keeper
 只要产物不安装：`./build.sh`，产物在 `build/E5Keeper.app`。
 
 需要 macOS 14+ 和 Xcode / Command Line Tools。ad-hoc 签名，不需要开发者账号。开机自启：把 `/Applications/E5Keeper.app` 加进「系统设置 → 通用 → 登录项」。
-
-## 几个事实
-
-- 续订由微软判断，工具做的是把 API 调用活跃度提上去
-- Mac 睡眠期间不调用，要 7×24 就挂服务器
-- 缺权限的接口返回 403，记一条日志，不影响其他调用
 
 ## 目录
 
