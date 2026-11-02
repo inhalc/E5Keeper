@@ -1,0 +1,4 @@
+.build/
+build/
+*.icns
+.DS_Store
