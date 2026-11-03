@@ -385,6 +385,49 @@ final class Engine: ObservableObject {
         let line = LogLine(date: Date(), level: level, text: text)
         logs.append(line)
         if logs.count > 300 { logs.removeFirst(logs.count - 300) }
+        store.appendLog("[\(timeStringFull(line.date))] \(level.rawValue.uppercased()) \(text)")
+    }
+
+    private func timeStringFull(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f.string(from: d)
+    }
+
+    // MARK: - 接口自检
+
+    /// 把 43 个接口各调一次，逐条记日志，最后汇总。用于排查 401/403。
+    func runSelfCheck() async {
+        log(.info, "开始接口自检，共 \(GraphAPI.readEndpoints.count) 个接口")
+        var counter: [Int: Int] = [:]
+        var bad: [String] = []
+        for path in GraphAPI.readEndpoints {
+            do {
+                let token = try await validToken()
+                let r = try await GraphAPI.get(path, token: token)
+                counter[r.status, default: 0] += 1
+                let msg = serverMessage(r.data)
+                if (200...299).contains(r.status) {
+                    log(.ok, "自检 \(path) → \(r.status)")
+                } else {
+                    bad.append("\(path) → \(r.status) \(msg)")
+                    log(r.status == 403 ? .warn : .err, "自检 \(path) → \(r.status) \(msg)")
+                }
+            } catch {
+                counter[-1, default: 0] += 1
+                bad.append("\(path) → 失败 \(error.localizedDescription)")
+                log(.err, "自检 \(path) → 失败 \(error.localizedDescription)")
+            }
+            try? await Task.sleep(nanoseconds: 800_000_000)
+        }
+        let summary = counter.sorted { $0.key < $1.key }
+            .map { "\($0.key < 0 ? "异常" : "\($0.key)"): \($0.value)" }
+            .joined(separator: "  ")
+        log(.info, "自检汇总 \(summary)")
+        if !bad.isEmpty {
+            log(.warn, "失败项共 \(bad.count) 条：")
+            for b in bad { log(.warn, "  · \(b)") }
+        }
     }
 
     func clearLogs() { logs.removeAll() }

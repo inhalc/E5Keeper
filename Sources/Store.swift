@@ -67,4 +67,31 @@ final class Store {
     func resetStats() {
         try? FileManager.default.removeItem(at: statsURL)
     }
+
+    // MARK: 日志落盘
+
+    private var logURL: URL { dir.appendingPathComponent("app.log") }
+
+    func appendLog(_ line: String) {
+        let data = (line + "\n").data(using: .utf8) ?? Data()
+        if let fh = try? FileHandle(forWritingTo: logURL) {
+            fh.seekToEndOfFile()
+            fh.write(data)
+            try? fh.close()
+        } else {
+            try? data.write(to: logURL)
+        }
+        rotateLogIfNeeded()
+    }
+
+    private func rotateLogIfNeeded() {
+        let attrs = try? FileManager.default.attributesOfItem(atPath: logURL.path)
+        let size = (attrs?[.size] as? NSNumber)?.intValue ?? 0
+        guard size > 2 * 1024 * 1024 else { return }
+        let old = dir.appendingPathComponent("app.log.1")
+        try? FileManager.default.removeItem(at: old)
+        try? FileManager.default.moveItem(at: logURL, to: old)
+    }
+
+    var logPath: String { logURL.path }
 }

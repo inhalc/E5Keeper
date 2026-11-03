@@ -24,8 +24,6 @@ enum GraphAPI {
         "/me/calendars",
         "/me/contacts?$top=5",
         "/me/contactFolders",
-        "/me/photo",
-        "/me/manager",
         "/me/memberOf?$top=5",
         "/me/licenseDetails",
         "/me/insights/trending",
@@ -37,7 +35,6 @@ enum GraphAPI {
         "/me/planner/plans",
         "/me/todo/lists",
         "/me/joinedTeams",
-        "/me/chats?$top=5",
         "/me/settings",
         "/me/drive/root/search(q=%27a%27)",
         "/sites/root",
@@ -45,8 +42,7 @@ enum GraphAPI {
         "/groups?$top=5",
         "/users?$top=5",
         "/organization",
-        "/subscribedSkus",
-        "/me/activities/recent"
+        "/subscribedSkus"
     ]
 
     // MARK: - HTTP

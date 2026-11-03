@@ -33,6 +33,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 SettingsWindowController.shared.show()
             }
         }
+
+        if CommandLine.arguments.contains("--selfcheck") {
+            Task {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                await Engine.shared.runSelfCheck()
+                exit(0)
+            }
+        }
     }
 }
 
@@ -87,6 +95,11 @@ struct MenuView: View {
 
             Button("立即调用一轮") {
                 Task { await engine.runOnce() }
+            }
+            .disabled(!engine.hasToken || engine.busy)
+
+            Button("接口自检（36 个）") {
+                Task { await engine.runSelfCheck() }
             }
             .disabled(!engine.hasToken || engine.busy)
 
