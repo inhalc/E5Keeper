@@ -5,28 +5,15 @@ enum GraphAPI {
     static let loginBase = "https://login.microsoftonline.com"
     static let scope = "offline_access https://graph.microsoft.com/.default"
 
-    /// 专用会话：断网时等待网络恢复，而不是立刻抛错
+    /// 失败就快速返回，不等待网络恢复
     static let session: URLSession = {
         let c = URLSessionConfiguration.default
-        c.waitsForConnectivity = true
-        c.timeoutIntervalForRequest = 30
-        c.timeoutIntervalForResource = 90
+        c.waitsForConnectivity = false
+        c.timeoutIntervalForRequest = 15
+        c.timeoutIntervalForResource = 20
         c.httpMaximumConnectionsPerHost = 4
         return URLSession(configuration: c)
     }()
-
-    /// 网络的瞬时故障：休眠唤醒、Wi-Fi 重连、DNS 抖动
-    static func isTransient(_ error: Error) -> Bool {
-        guard let e = error as? URLError else { return false }
-        switch e.code {
-        case .networkConnectionLost, .timedOut, .notConnectedToInternet,
-             .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
-             .secureConnectionFailed, .resourceUnavailable, .badServerResponse:
-            return true
-        default:
-            return false
-        }
-    }
 
     /// 只读接口池。都挑轻量、对账号无副作用的查询。
     static let readEndpoints: [String] = [
@@ -80,26 +67,15 @@ enum GraphAPI {
         return URL(string: base + path)
     }
 
-    static func get(_ path: String, token: String, retries: Int = 2) async throws -> HTTPResult {
+    static func get(_ path: String, token: String) async throws -> HTTPResult {
         guard let u = url(path) else { throw SimpleError("非法 URL：\(path)") }
-        var attempt = 0
-        while true {
-            do {
-                var req = URLRequest(url: u)
-                req.httpMethod = "GET"
-                req.timeoutInterval = 30
-                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-                req.setValue("E5Keeper/1.0", forHTTPHeaderField: "User-Agent")
-                let (data, resp) = try await session.data(for: req)
-                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-                return HTTPResult(status: code, data: data)
-            } catch {
-                attempt += 1
-                if attempt > retries || !isTransient(error) || Task.isCancelled { throw error }
-                let delay = attempt == 1 ? 2.0 : 5.0
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-            }
-        }
+        var req = URLRequest(url: u)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("E5Keeper/1.0", forHTTPHeaderField: "User-Agent")
+        let (data, resp) = try await session.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        return HTTPResult(status: code, data: data)
     }
 
     static func put(_ path: String, token: String, body: Data, contentType: String) async throws -> HTTPResult {
