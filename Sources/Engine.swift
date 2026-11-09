@@ -27,6 +27,8 @@ final class Engine: ObservableObject {
     private var loopTask: Task<Void, Never>?
     private var ticker: Timer?
     private var consecutiveFailures = 0
+    /// 系统唤醒后给网络栈留的缓冲时间
+    private var wakeGrace: Date = .distantPast
 
     private init() {
         config = store.loadConfig()
@@ -42,6 +44,20 @@ final class Engine: ObservableObject {
 
         if config.autoStart && hasToken {
             start()
+        }
+
+        // 合盖唤醒后，Wi-Fi 往往还没连上，先等一会儿再发请求
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.wakeGrace = Date().addingTimeInterval(20)
+                if self.isRunning {
+                    self.nextFire = Date().addingTimeInterval(20)
+                    self.log(.info, "系统刚唤醒，等 20 秒让网络就绪")
+                }
+            }
         }
     }
 
@@ -107,6 +123,7 @@ final class Engine: ObservableObject {
 
     private func runLoop() async {
         while !Task.isCancelled {
+            await waitForWakeGrace()
             await runRound()
 
             guard !Task.isCancelled else { break }
@@ -125,6 +142,14 @@ final class Engine: ObservableObject {
             let step = min(1.0, remaining)
             try? await Task.sleep(nanoseconds: UInt64(step * 1_000_000_000))
             remaining -= step
+        }
+    }
+
+    /// 刚唤醒时先别发请求，等网络栈连上
+    private func waitForWakeGrace() async {
+        let remaining = wakeGrace.timeIntervalSinceNow
+        if remaining > 0 {
+            await sleepTick(seconds: remaining)
         }
     }
 
